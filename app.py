@@ -1,51 +1,66 @@
 import sys
 from PIL import Image
 
-mapeo = int(sys.argv[2]) if len(sys.argv) > 1 and sys.argv[2].isdigit() else 1 # leer argumento de la línea de comandos o asignar valor predeterminado
+# Escala de brillo usando caracteres gráficos extendidos, ordenados de oscuro a claro
+ASCII_CHARS = (
+    "█"  # 219 Full block
+    "▓"  # 178 Dark shade
+    "╬" "╫" "╪"  # Box drawings dense cross
+    "▒"  # 177 Medium shade
+    "╩" "╦" "╠" "╣" "╬"  # Box corners/double joints
+    "║" "═"  # Double vertical/horizontal
+    "╚" "╔" "╩" "╦"  # Corners
+    "╡" "╢" "╞" "╟"  # Box joins
+    "│" "─"  # Light lines
+    "┼" "┤" "├" "┬" "┴"  # Light box joins
+    "░"  # 176 Light shade
+    "·" " "  # Dots and space (lightest)
+)
 
-pic = Image.open(f"img/in/{sys.argv[1]}") # leer imagen
-newpic = pic.resize((300, 278)) # redimensionar imagen a 100x100 píxeles
-pixels = newpic.load()
-width, height = newpic.size # obtener dimensiones de la imagen, pic.size devuelve una tupla (width, height) que se descompone en dos variables
-ASCII_characters = "`^\",:;Il!i~+_-?][}{1)(|\\/tfjrxnuvczXYUJCLQ0OZmwqpdbkhao*#MW&8%B@$" # caracteres ASCII para representar el brillo de los píxeles
-pixel_RGB_list = [] # lista para almacenar los píxeles
+# Mapeo de brillo a carácter ASCII
+def map_brightness_to_ascii(brightness):
+    scale = len(ASCII_CHARS) - 1
+    index = int((brightness / 255) * scale)
+    return ASCII_CHARS[index]
 
-for y in range(height):
-    row = [] # lista para almacenar los píxeles de  la fila actual
-    for x in range(width):
-        pixel = pixels[x, y]
-        row.append(pixel) # agregar píxel a la fila        
-    pixel_RGB_list.append(row) # agregar píxel a la lista
+# Cálculo de brillo
+def get_brightness(pixel, method=1):
+    r, g, b = pixel[:3]
+    if method == 1:
+        return (r + g + b) // 3
+    elif method == 2:
+        return (max(pixel) + min(pixel)) // 2
+    elif method == 3:
+        return int(0.21 * r + 0.72 * g + 0.07 * b)
+    else:
+        return (r + g + b) // 3
 
- # imprimir la lista de píxeles
-pixel_brightness_list = [] # lista para almacenar el brillo de los píxeles
-for RGBrow in pixel_RGB_list:
-    bright_row = [] # lista para almacenar el brillo de los píxeles de la fila actual
-    for pixel in RGBrow:
-        if mapeo == 1:
-            brightness = int((pixel[0] + pixel[1] + pixel[2]) / 3)
-            bright_row.append(brightness)
-        elif mapeo == 2:
-            lightness = (max(pixel) + min(pixel)) / 2
-            bright_row.append(lightness)
-        elif mapeo == 3:
-            luminosity = int((pixel[0] * 0.21 + pixel[1] * 0.72 + pixel[2] * 0.07))
-            bright_row.append(luminosity)
-    pixel_brightness_list.append(bright_row)
-pixels__ASCII = []
-for bright_row in pixel_brightness_list:
-    ASCII_row = [] # lista para almacenar los caracteres ASCII de la fila actual
-    for brightness in bright_row:
-        # mapear el brillo a un carácter ASCII
-        index = int((brightness / 255) * (len(ASCII_characters) - 1)) # calcular el índice del carácter ASCII
-        ASCII_row.append(ASCII_characters[index]) # agregar carácter ASCII a la fila
-    pixels__ASCII.append(ASCII_row) # agregar fila a la lista
+# Convertir imagen a ASCII
+def image_to_ascii(image_path, method=1, width=100):
+    try:
+        img = Image.open(image_path)
+    except FileNotFoundError:
+        print("Archivo no encontrado.")
+        return
 
-# imprimir la lista de caracteres ASCII
-for ASCIIrow in pixels__ASCII:
-    for ASCII in ASCIIrow:
-        print(ASCII, end="")
-        print(ASCII, end="")
-        print(ASCII, end="")# imprimir carácter ASCII sin salto de línea
-    print() # imprimir salto de línea al final de la fila
-    
+    aspect_ratio = img.height / img.width
+    new_height = int(aspect_ratio * width * 0.5)  # Ajuste visual
+    img = img.resize((width, new_height))
+    img = img.convert("RGB")
+
+    for y in range(img.height):
+        for x in range(img.width):
+            brightness = get_brightness(img.getpixel((x, y)), method)
+            char = map_brightness_to_ascii(brightness)
+            print(char * 2, end="")  # Duplicamos para aspecto proporcional
+        print()
+
+# Uso desde línea de comandos
+if __name__ == "__main__":
+    if len(sys.argv) < 2:
+        print("Uso: python script.py <nombre_imagen> [metodo]")
+        sys.exit(1)
+
+    image_file = f"img/in/{sys.argv[1]}"
+    method = int(sys.argv[2]) if len(sys.argv) > 2 and sys.argv[2].isdigit() else 1
+    image_to_ascii(image_file, method, width=100)
